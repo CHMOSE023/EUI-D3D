@@ -1,0 +1,1167 @@
+#pragma once
+
+#include "core/layout.h"
+#include "core/animation.h"
+#include "core/event.h"
+#include "core/image.h"
+#include "core/primitive.h"
+#include "core/text.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+namespace core::dsl {
+
+    using AnimProperty = core::AnimProperty;
+    using Ease = core::Ease;
+    using Transition = core::Transition;
+
+    inline std::string utf8(unsigned int codepoint) {
+        std::string result;
+        if (codepoint <= 0x7F) {
+            result.push_back(static_cast<char>(codepoint));
+        }
+        else if (codepoint <= 0x7FF) {
+            result.push_back(static_cast<char>(0xC0 | ((codepoint >> 6) & 0x1F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+        else if (codepoint <= 0xFFFF) {
+            result.push_back(static_cast<char>(0xE0 | ((codepoint >> 12) & 0x0F)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+        else {
+            result.push_back(static_cast<char>(0xF0 | ((codepoint >> 18) & 0x07)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+        return result;
+    }
+
+    enum class ElementKind {
+        Row,
+        Column,
+        Stack,
+        Flow,
+        Rect,
+        Polygon,
+        Text,
+        Image
+    };
+
+    struct Screen {
+        float width = 0.0f;
+        float height = 0.0f;
+    };
+
+    struct DragEvent {
+        double x = 0.0;
+        double y = 0.0;
+        double deltaX = 0.0;
+        double deltaY = 0.0;
+        double totalX = 0.0;
+        double totalY = 0.0;
+    };
+
+    struct Element {
+        ElementKind kind = ElementKind::Stack;
+        std::string id;
+
+        bool hasX = false;
+        bool hasY = false;
+        float x = 0.0f;
+        float y = 0.0f;
+        SizeValue width = SizeValue::wrapContent();
+        SizeValue height = SizeValue::wrapContent();
+        EdgeInsets margin;
+        EdgeInsets padding;
+        float spacing = 0.0f;
+        float lineSpacing = 0.0f;
+        Align mainAlign = Align::START;
+        Align crossAlign = Align::START;
+        LayoutRect frame;
+        int zIndex = 0;
+        bool clip = false;
+        float minLayoutWidth = 0.0f;
+        float minLayoutHeight = 0.0f;
+        float maxLayoutWidth = 0.0f;
+        float maxLayoutHeight = 0.0f;
+        float flexGrow = 0.0f;
+        float flexShrink = 1.0f;
+
+        Color color = { 1.0f, 1.0f, 1.0f, 1.0f };
+        Gradient gradient;
+        Border border;
+        Shadow shadow;
+        Transform transform;
+        float radius = 0.0f;
+        float blur = 0.0f;
+        float opacity = 1.0f;
+        std::vector<Vec2> polygonPoints;
+
+        std::string text;
+        std::string fontFamily;
+        float fontSize = 16.0f;
+        int fontWeight = 400;
+        Color textColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+        float maxWidth = 0.0f;
+        bool wrap = false;
+        HorizontalAlign horizontalAlign = HorizontalAlign::Left;
+        VerticalAlign verticalAlign = VerticalAlign::Top;
+        float lineHeight = 0.0f;
+
+        std::string imageSource;
+        bool imageFlipVertically = false;
+        ImageFit imageFit = ImageFit::Cover;
+
+        bool interactive = false;
+        bool focusable = false;
+        bool disabled = false;
+        bool hasImeRect = false;
+        Rect imeRect;
+        CursorShape cursor = CursorShape::Arrow;
+        Color hoverColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+        Color pressedColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+        bool hasStateColors = false;
+        bool smoothStateColors = true;
+        std::function<void()> onClick;
+        std::function<void(const PointerEvent&, const Rect&)> onPress;
+        std::function<void(const PointerEvent&, const Rect&)> onContextMenu;
+        std::function<void(bool)> onFocusChanged;
+        std::function<void(const KeyboardEvent&)> onTextInput;
+        std::function<void(const ScrollEvent&)> onScroll;
+        std::function<void(const DragEvent&)> onDrag;
+        std::function<void()> onTimer;
+        float timerSeconds = 0.0f;
+        std::string visualStateSourceId;
+        std::string hoverOpacitySourceId;
+        float pressedScale = 1.0f;
+        float hoverHiddenOpacity = 0.0f;
+        float hoverVisibleOpacity = 1.0f;
+        Transition transition;
+        bool explicitFrameAnimation = false;
+
+        std::vector<std::unique_ptr<Element>> children;
+
+        LayoutType layoutType() const {
+            if (kind == ElementKind::Row) {
+                return LayoutType::Row;
+            }
+            if (kind == ElementKind::Column) {
+                return LayoutType::Column;
+            }
+            if (kind == ElementKind::Flow) {
+                return LayoutType::Flow;
+            }
+            return LayoutType::Stack;
+        }
+    };
+
+    class Ui;
+
+    template <typename Derived>
+    class BuilderBase {
+    public:
+        Derived& x(float value) {
+            element_->hasX = true;
+            element_->x = value;
+            return self();
+        }
+
+        Derived& y(float value) {
+            element_->hasY = true;
+            element_->y = value;
+            return self();
+        }
+
+        Derived& position(float xValue, float yValue) {
+            element_->hasX = true;
+            element_->hasY = true;
+            element_->x = xValue;
+            element_->y = yValue;
+            return self();
+        }
+
+        Derived& width(float value) {
+            element_->width = SizeValue::fixed(value);
+            return self();
+        }
+
+        Derived& width(SizeValue value) {
+            element_->width = value;
+            return self();
+        }
+
+        Derived& height(float value) {
+            element_->height = SizeValue::fixed(value);
+            return self();
+        }
+
+        Derived& height(SizeValue value) {
+            element_->height = value;
+            return self();
+        }
+
+        Derived& size(float widthValue, float heightValue) {
+            element_->width = SizeValue::fixed(widthValue);
+            element_->height = SizeValue::fixed(heightValue);
+            return self();
+        }
+
+        Derived& size(SizeValue widthValue, SizeValue heightValue) {
+            element_->width = widthValue;
+            element_->height = heightValue;
+            return self();
+        }
+
+        Derived& fill() {
+            element_->width = SizeValue::fill();
+            element_->height = SizeValue::fill();
+            return self();
+        }
+
+        Derived& wrapContent() {
+            element_->width = SizeValue::wrapContent();
+            element_->height = SizeValue::wrapContent();
+            return self();
+        }
+
+        Derived& margin(float value) {
+            element_->margin = EdgeInsets::all(std::max(0.0f, value));
+            return self();
+        }
+
+        Derived& margin(float horizontal, float vertical) {
+            element_->margin = {
+                std::max(0.0f, horizontal),
+                std::max(0.0f, vertical),
+                std::max(0.0f, horizontal),
+                std::max(0.0f, vertical)
+            };
+            return self();
+        }
+
+        Derived& margin(float left, float top, float right, float bottom) {
+            element_->margin = {
+                std::max(0.0f, left),
+                std::max(0.0f, top),
+                std::max(0.0f, right),
+                std::max(0.0f, bottom)
+            };
+            return self();
+        }
+
+        Derived& gap(float value) {
+            element_->spacing = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& spacing(float value) {
+            return gap(value);
+        }
+
+        Derived& lineGap(float value) {
+            element_->lineSpacing = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& lineSpacing(float value) {
+            return lineGap(value);
+        }
+
+        Derived& padding(float value) {
+            element_->padding = EdgeInsets::all(std::max(0.0f, value));
+            return self();
+        }
+
+        Derived& padding(float horizontal, float vertical) {
+            element_->padding = {
+                std::max(0.0f, horizontal),
+                std::max(0.0f, vertical),
+                std::max(0.0f, horizontal),
+                std::max(0.0f, vertical)
+            };
+            return self();
+        }
+
+        Derived& padding(float left, float top, float right, float bottom) {
+            element_->padding = {
+                std::max(0.0f, left),
+                std::max(0.0f, top),
+                std::max(0.0f, right),
+                std::max(0.0f, bottom)
+            };
+            return self();
+        }
+
+        Derived& justifyContent(Align value) {
+            element_->mainAlign = value;
+            return self();
+        }
+
+        Derived& alignItems(Align value) {
+            element_->crossAlign = value;
+            return self();
+        }
+
+        Derived& align(Align main, Align cross) {
+            element_->mainAlign = main;
+            element_->crossAlign = cross;
+            return self();
+        }
+
+        Derived& minWidth(float value) {
+            element_->minLayoutWidth = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& minHeight(float value) {
+            element_->minLayoutHeight = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& minSize(float widthValue, float heightValue) {
+            element_->minLayoutWidth = std::max(0.0f, widthValue);
+            element_->minLayoutHeight = std::max(0.0f, heightValue);
+            return self();
+        }
+
+        Derived& maxWidth(float value) {
+            element_->maxLayoutWidth = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& maxHeight(float value) {
+            element_->maxLayoutHeight = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& maxSize(float widthValue, float heightValue) {
+            element_->maxLayoutWidth = std::max(0.0f, widthValue);
+            element_->maxLayoutHeight = std::max(0.0f, heightValue);
+            return self();
+        }
+
+        Derived& flexGrow(float value = 1.0f) {
+            element_->flexGrow = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& flexShrink(float value = 1.0f) {
+            element_->flexShrink = std::max(0.0f, value);
+            return self();
+        }
+
+        Derived& flex(float grow, float shrink = 1.0f) {
+            element_->flexGrow = std::max(0.0f, grow);
+            element_->flexShrink = std::max(0.0f, shrink);
+            return self();
+        }
+
+        Derived& zIndex(int value) {
+            element_->zIndex = value;
+            return self();
+        }
+
+        Derived& z(int value) {
+            return zIndex(value);
+        }
+
+        Derived& clip(bool value = true) {
+            element_->clip = value;
+            return self();
+        }
+
+        Derived& overflowHidden(bool value = true) {
+            return clip(value);
+        }
+
+        Derived& pressedScale(float value) {
+            element_->pressedScale = std::clamp(value, 0.80f, 1.0f);
+            return self();
+        }
+
+        Derived& interactive(bool value = true) {
+            element_->interactive = value;
+            if (value) {
+                element_->cursor = CursorShape::Hand;
+            }
+            return self();
+        }
+
+        Derived& focusable(bool value = true) {
+            element_->focusable = value;
+            element_->interactive = value || element_->interactive;
+            return self();
+        }
+
+        Derived& imeRect(float xValue, float yValue, float widthValue, float heightValue) {
+            element_->hasImeRect = true;
+            element_->imeRect = {
+                xValue,
+                yValue,
+                std::max(0.0f, widthValue),
+                std::max(0.0f, heightValue)
+            };
+            return self();
+        }
+
+        Derived& disabled(bool value = true) {
+            element_->disabled = value;
+            return self();
+        }
+
+        Derived& enabled(bool value = true) {
+            element_->disabled = !value;
+            return self();
+        }
+
+        Derived& cursor(CursorShape value) {
+            element_->cursor = value;
+            return self();
+        }
+
+        Derived& opacity(float value) {
+            element_->opacity = std::clamp(value, 0.0f, 1.0f);
+            return self();
+        }
+
+        Derived& translate(float xValue, float yValue) {
+            element_->transform.translate = { xValue, yValue };
+            return self();
+        }
+
+        Derived& translateX(float value) {
+            element_->transform.translate.x = value;
+            return self();
+        }
+
+        Derived& translateY(float value) {
+            element_->transform.translate.y = value;
+            return self();
+        }
+
+        Derived& scale(float value) {
+            element_->transform.scale = { value, value };
+            return self();
+        }
+
+        Derived& scale(float xValue, float yValue) {
+            element_->transform.scale = { xValue, yValue };
+            return self();
+        }
+
+        Derived& rotate(float radians) {
+            element_->transform.rotate = radians;
+            return self();
+        }
+
+        Derived& rotation(float radians) {
+            return rotate(radians);
+        }
+
+        Derived& transformOrigin(float xValue, float yValue) {
+            element_->transform.origin = { xValue, yValue };
+            return self();
+        }
+
+        Derived& smoothStates(bool value = true) {
+            element_->smoothStateColors = value;
+            return self();
+        }
+
+        Derived& instantStates() {
+            element_->smoothStateColors = false;
+            return self();
+        }
+
+        Derived& onClick(std::function<void()> callback) {
+            element_->interactive = true;
+            element_->cursor = CursorShape::Hand;
+            element_->onClick = std::move(callback);
+            return self();
+        }
+
+        Derived& onPress(std::function<void(const PointerEvent&, const Rect&)> callback) {
+            element_->interactive = true;
+            element_->cursor = CursorShape::Hand;
+            element_->onPress = std::move(callback);
+            return self();
+        }
+
+        Derived& onContextMenu(std::function<void(const PointerEvent&, const Rect&)> callback) {
+            element_->interactive = true;
+            element_->cursor = CursorShape::Hand;
+            element_->onContextMenu = std::move(callback);
+            return self();
+        }
+
+        Derived& onFocusChanged(std::function<void(bool)> callback) {
+            element_->focusable = true;
+            element_->interactive = true;
+            element_->onFocusChanged = std::move(callback);
+            return self();
+        }
+
+        Derived& onTextInput(std::function<void(const KeyboardEvent&)> callback) {
+            element_->focusable = true;
+            element_->interactive = true;
+            element_->onTextInput = std::move(callback);
+            return self();
+        }
+
+        Derived& onScroll(std::function<void(const ScrollEvent&)> callback) {
+            element_->interactive = true;
+            element_->onScroll = std::move(callback);
+            return self();
+        }
+
+        Derived& onDrag(std::function<void(const DragEvent&)> callback) {
+            element_->interactive = true;
+            element_->onDrag = std::move(callback);
+            return self();
+        }
+
+        Derived& onTimer(float seconds, std::function<void()> callback) {
+            element_->timerSeconds = std::max(0.0f, seconds);
+            element_->onTimer = std::move(callback);
+            return self();
+        }
+
+        Derived& visualStateFrom(const std::string& id, float pressedScaleValue = 0.965f);
+        Derived& hoverOpacityFrom(const std::string& id, float hiddenOpacity = 0.0f, float visibleOpacity = 1.0f);
+
+        Derived& transition(const Transition& value) {
+            element_->transition = value;
+            return self();
+        }
+
+        Derived& transition(float durationSeconds, Ease ease = Ease::OutCubic) {
+            element_->transition = Transition::make(durationSeconds, ease);
+            return self();
+        }
+
+        Derived& animate(AnimProperty property) {
+            element_->transition.enabled = true;
+            element_->transition.properties = property;
+            if (hasAnimProperty(property, AnimProperty::Frame)) {
+                element_->explicitFrameAnimation = true;
+            }
+            return self();
+        }
+
+        template <typename Fn>
+        Derived& content(Fn&& compose);
+
+        void build() {}
+
+    protected:
+        BuilderBase(Ui& ui, Element* element) : ui_(&ui), element_(element) {}
+
+        Derived& self() {
+            return static_cast<Derived&>(*this);
+        }
+
+        Ui* ui_ = nullptr;
+        Element* element_ = nullptr;
+    };
+
+    template <typename Derived>
+    class ShapeBuilderBase : public BuilderBase<Derived> {
+    public:
+        using BuilderBase<Derived>::BuilderBase;
+
+        Derived& color(const Color& value) {
+            this->element_->color = value;
+            return this->self();
+        }
+
+        Derived& background(const Color& value) {
+            return color(value);
+        }
+
+        Derived& background(float r, float g, float b, float a = 1.0f) {
+            this->element_->color = { r, g, b, a };
+            return this->self();
+        }
+
+        Derived& gradient(const Gradient& value) {
+            this->element_->gradient = value;
+            return this->self();
+        }
+
+        Derived& gradient(const Color& start, const Color& end, GradientDirection direction = GradientDirection::Vertical) {
+            this->element_->gradient = { true, start, end, direction };
+            return this->self();
+        }
+
+        Derived& rounding(float value) {
+            this->element_->radius = std::max(0.0f, value);
+            return this->self();
+        }
+
+        Derived& radius(float value) {
+            return rounding(value);
+        }
+
+        Derived& border(float widthValue, const Color& colorValue) {
+            this->element_->border = { std::max(0.0f, widthValue), colorValue };
+            return this->self();
+        }
+
+        Derived& border(const Border& value) {
+            this->element_->border = value;
+            return this->self();
+        }
+
+        Derived& shadow(float blur, float offsetY, const Color& colorValue) {
+            this->element_->shadow = { true, {0.0f, offsetY}, std::max(0.0f, blur), 0.0f, colorValue };
+            return this->self();
+        }
+
+        Derived& shadow(float blur, float offsetX, float offsetY, const Color& colorValue) {
+            this->element_->shadow = { true, {offsetX, offsetY}, std::max(0.0f, blur), 0.0f, colorValue };
+            return this->self();
+        }
+
+        Derived& shadow(const Shadow& value) {
+            this->element_->shadow = value;
+            return this->self();
+        }
+
+        Derived& blur(float value) {
+            this->element_->blur = std::max(0.0f, value);
+            return this->self();
+        }
+
+        Derived& opacity(float value) {
+            this->element_->opacity = std::clamp(value, 0.0f, 1.0f);
+            return this->self();
+        }
+
+        Derived& translate(float xValue, float yValue) {
+            this->element_->transform.translate = { xValue, yValue };
+            return this->self();
+        }
+
+        Derived& translateX(float value) {
+            this->element_->transform.translate.x = value;
+            return this->self();
+        }
+
+        Derived& translateY(float value) {
+            this->element_->transform.translate.y = value;
+            return this->self();
+        }
+
+        Derived& scale(float value) {
+            this->element_->transform.scale = { value, value };
+            return this->self();
+        }
+
+        Derived& scale(float xValue, float yValue) {
+            this->element_->transform.scale = { xValue, yValue };
+            return this->self();
+        }
+
+        Derived& rotate(float radians) {
+            this->element_->transform.rotate = radians;
+            return this->self();
+        }
+
+        Derived& rotation(float radians) {
+            return rotate(radians);
+        }
+
+        Derived& transformOrigin(float xValue, float yValue) {
+            this->element_->transform.origin = { xValue, yValue };
+            return this->self();
+        }
+
+        Derived& interactive(bool value = true) {
+            this->element_->interactive = value;
+            if (value) {
+                this->element_->cursor = CursorShape::Hand;
+            }
+            return this->self();
+        }
+
+        Derived& hoverColor(const Color& value) {
+            this->element_->hoverColor = value;
+            this->element_->hasStateColors = true;
+            return this->self();
+        }
+
+        Derived& pressedColor(const Color& value) {
+            this->element_->pressedColor = value;
+            this->element_->hasStateColors = true;
+            return this->self();
+        }
+
+        Derived& states(const Color& normal, const Color& hover, const Color& pressed) {
+            this->element_->color = normal;
+            this->element_->hoverColor = hover;
+            this->element_->pressedColor = pressed;
+            this->element_->hasStateColors = true;
+            this->element_->interactive = true;
+            this->element_->cursor = CursorShape::Hand;
+            return this->self();
+        }
+
+        Derived& onClick(std::function<void()> callback) {
+            this->element_->interactive = true;
+            this->element_->cursor = CursorShape::Hand;
+            this->element_->onClick = std::move(callback);
+            return this->self();
+        }
+
+        Derived& onContextMenu(std::function<void(const PointerEvent&, const Rect&)> callback) {
+            this->element_->interactive = true;
+            this->element_->cursor = CursorShape::Hand;
+            this->element_->onContextMenu = std::move(callback);
+            return this->self();
+        }
+
+    };
+
+    class LayoutBuilder : public BuilderBase<LayoutBuilder> {
+    public:
+        LayoutBuilder(Ui& ui, Element* element) : BuilderBase<LayoutBuilder>(ui, element) {}
+    };
+
+    class RectBuilder : public ShapeBuilderBase<RectBuilder> {
+    public:
+        RectBuilder(Ui& ui, Element* element) : ShapeBuilderBase<RectBuilder>(ui, element) {}
+    };
+
+    class PolygonBuilder : public ShapeBuilderBase<PolygonBuilder> {
+    public:
+        PolygonBuilder(Ui& ui, Element* element) : ShapeBuilderBase<PolygonBuilder>(ui, element) {}
+
+        PolygonBuilder& points(std::vector<Vec2> value) {
+            element_->polygonPoints = std::move(value);
+            return *this;
+        }
+
+        PolygonBuilder& point(float x, float y) {
+            element_->polygonPoints.push_back({ x, y });
+            return *this;
+        }
+
+        PolygonBuilder& clearPoints() {
+            element_->polygonPoints.clear();
+            return *this;
+        }
+    };
+
+    class TextBuilder : public BuilderBase<TextBuilder> {
+    public:
+        TextBuilder(Ui& ui, Element* element) : BuilderBase<TextBuilder>(ui, element) {}
+
+        TextBuilder& text(const std::string& value) {
+            element_->text = value;
+            return *this;
+        }
+
+        TextBuilder& fontFamily(const std::string& value) {
+            element_->fontFamily = value;
+            return *this;
+        }
+
+        TextBuilder& font(const std::string& value) {
+            return fontFamily(value);
+        }
+
+        TextBuilder& customFont(const std::string& value) {
+            return fontFamily(value);
+        }
+
+        TextBuilder& fontSize(float value) {
+            element_->fontSize = std::max(1.0f, value);
+            return *this;
+        }
+
+        TextBuilder& fontWeight(int value) {
+            element_->fontWeight = value;
+            return *this;
+        }
+
+        TextBuilder& color(const Color& value) {
+            element_->textColor = value;
+            return *this;
+        }
+
+        TextBuilder& opacity(float value) {
+            element_->opacity = std::clamp(value, 0.0f, 1.0f);
+            return *this;
+        }
+
+        TextBuilder& maxWidth(float value) {
+            element_->maxWidth = std::max(0.0f, value);
+            return *this;
+        }
+
+        TextBuilder& wrap(bool value = true) {
+            element_->wrap = value;
+            return *this;
+        }
+
+        TextBuilder& horizontalAlign(HorizontalAlign value) {
+            element_->horizontalAlign = value;
+            return *this;
+        }
+
+        TextBuilder& verticalAlign(VerticalAlign value) {
+            element_->verticalAlign = value;
+            return *this;
+        }
+
+        TextBuilder& lineHeight(float value) {
+            element_->lineHeight = std::max(0.0f, value);
+            return *this;
+        }
+
+        TextBuilder& icon(unsigned int codepoint) {
+            element_->text = utf8(codepoint);
+            element_->fontFamily = "Icon";
+            return *this;
+        }
+
+        TextBuilder& icon(const std::string& value) {
+            element_->text = value;
+            element_->fontFamily = "Icon";
+            return *this;
+        }
+
+    };
+
+    class ImageBuilder : public BuilderBase<ImageBuilder> {
+    public:
+        ImageBuilder(Ui& ui, Element* element) : BuilderBase<ImageBuilder>(ui, element) {}
+
+        ImageBuilder& source(const std::string& value) {
+            element_->imageSource = value;
+            return *this;
+        }
+
+        ImageBuilder& path(const std::string& value) {
+            return source(value);
+        }
+
+        ImageBuilder& url(const std::string& value) {
+            return source(value);
+        }
+
+        ImageBuilder& bingDaily(int idx = 0, const std::string& mkt = "zh-CN") {
+            element_->imageSource = "bing://daily?idx=" + std::to_string(std::max(0, idx)) + "&mkt=" + mkt;
+            return *this;
+        }
+
+        ImageBuilder& tint(const Color& value) {
+            element_->color = value;
+            return *this;
+        }
+
+        ImageBuilder& color(const Color& value) {
+            return tint(value);
+        }
+
+        ImageBuilder& radius(float value) {
+            element_->radius = std::max(0.0f, value);
+            return *this;
+        }
+
+        ImageBuilder& rounding(float value) {
+            return radius(value);
+        }
+
+        ImageBuilder& opacity(float value) {
+            element_->opacity = std::clamp(value, 0.0f, 1.0f);
+            return *this;
+        }
+
+        ImageBuilder& flipVertically(bool value = true) {
+            element_->imageFlipVertically = value;
+            return *this;
+        }
+
+        ImageBuilder& fit(ImageFit value) {
+            element_->imageFit = value;
+            return *this;
+        }
+
+        ImageBuilder& cover() {
+            return fit(ImageFit::Cover);
+        }
+
+        ImageBuilder& contain() {
+            return fit(ImageFit::Contain);
+        }
+
+        ImageBuilder& stretch() {
+            return fit(ImageFit::Stretch);
+        }
+
+        ImageBuilder& translate(float xValue, float yValue) {
+            element_->transform.translate = { xValue, yValue };
+            return *this;
+        }
+
+        ImageBuilder& translateX(float value) {
+            element_->transform.translate.x = value;
+            return *this;
+        }
+
+        ImageBuilder& translateY(float value) {
+            element_->transform.translate.y = value;
+            return *this;
+        }
+
+        ImageBuilder& scale(float value) {
+            element_->transform.scale = { value, value };
+            return *this;
+        }
+
+        ImageBuilder& scale(float xValue, float yValue) {
+            element_->transform.scale = { xValue, yValue };
+            return *this;
+        }
+
+        ImageBuilder& rotate(float radians) {
+            element_->transform.rotate = radians;
+            return *this;
+        }
+
+        ImageBuilder& rotation(float radians) {
+            return rotate(radians);
+        }
+
+        ImageBuilder& transformOrigin(float xValue, float yValue) {
+            element_->transform.origin = { xValue, yValue };
+            return *this;
+        }
+    };
+
+    class Ui {
+    public:
+        void begin(const std::string& pageId = "") {
+            pageId_ = pageId;
+            roots_.clear();
+            stack_.clear();
+            index_.clear();
+            generatedId_ = 0;
+        }
+
+        void end() {
+            stack_.clear();
+        }
+
+        LayoutBuilder row(const std::string& id = "") {
+            return LayoutBuilder(*this, addElement(ElementKind::Row, id));
+        }
+
+        LayoutBuilder column(const std::string& id = "") {
+            return LayoutBuilder(*this, addElement(ElementKind::Column, id));
+        }
+
+        LayoutBuilder flow(const std::string& id = "") {
+            return LayoutBuilder(*this, addElement(ElementKind::Flow, id));
+        }
+
+        LayoutBuilder stack(const std::string& id = "") {
+            return LayoutBuilder(*this, addElement(ElementKind::Stack, id));
+        }
+
+        RectBuilder rect(const std::string& id) {
+            return RectBuilder(*this, addElement(ElementKind::Rect, id));
+        }
+
+        PolygonBuilder polygon(const std::string& id) {
+            return PolygonBuilder(*this, addElement(ElementKind::Polygon, id));
+        }
+
+        TextBuilder text(const std::string& id) {
+            return TextBuilder(*this, addElement(ElementKind::Text, id));
+        }
+
+        TextBuilder label(const std::string& id) {
+            return text(id);
+        }
+
+        ImageBuilder image(const std::string& id) {
+            return ImageBuilder(*this, addElement(ElementKind::Image, id));
+        }
+
+        void layout(float width, float height) {
+            for (const auto& root : roots_) {
+                std::vector<std::pair<Element*, Node*>> links;
+                std::unique_ptr<Node> layoutRoot = buildLayoutNode(*root, links);
+                layoutRoot->measure(width, height);
+                layoutRoot->layout(root->hasX ? root->x : 0.0f, root->hasY ? root->y : 0.0f);
+                for (const auto& link : links) {
+                    link.first->frame = link.second->frame();
+                }
+            }
+        }
+
+        void layout(const Screen& screen) {
+            layout(screen.width, screen.height);
+        }
+
+        Element* find(const std::string& id) {
+            const auto it = index_.find(resolveId(id));
+            return it == index_.end() ? nullptr : it->second;
+        }
+
+        const Element* find(const std::string& id) const {
+            const auto it = index_.find(resolveId(id));
+            return it == index_.end() ? nullptr : it->second;
+        }
+
+        const std::vector<std::unique_ptr<Element>>& roots() const {
+            return roots_;
+        }
+
+        bool isFocused(const std::string& id) const {
+            return !focusedId_.empty() && focusedId_ == resolveId(id);
+        }
+
+    private:
+        friend class Runtime;
+        friend class BuilderBase<LayoutBuilder>;
+        friend class BuilderBase<RectBuilder>;
+        friend class BuilderBase<PolygonBuilder>;
+        friend class BuilderBase<TextBuilder>;
+        friend class BuilderBase<ImageBuilder>;
+
+        void setFocusedId(const std::string& id) {
+            focusedId_ = id;
+        }
+
+        Element* addElement(ElementKind kind, const std::string& id) {
+            auto element = std::make_unique<Element>();
+            element->kind = kind;
+            element->id = id.empty() ? makeGeneratedId(kind) : resolveId(id);
+            Element* raw = element.get();
+
+            if (stack_.empty()) {
+                roots_.push_back(std::move(element));
+            }
+            else {
+                stack_.back()->children.push_back(std::move(element));
+            }
+
+            index_[raw->id] = raw;
+            return raw;
+        }
+
+        void push(Element* element) {
+            stack_.push_back(element);
+        }
+
+        void pop() {
+            if (!stack_.empty()) {
+                stack_.pop_back();
+            }
+        }
+
+        std::string resolveId(const std::string& id) const {
+            if (id.empty() || pageId_.empty()) {
+                return id;
+            }
+            const std::string prefix = pageId_ + ".";
+            if (id.rfind(prefix, 0) == 0) {
+                return id;
+            }
+            return pageId_ + "." + id;
+        }
+
+        std::string makeGeneratedId(ElementKind kind) {
+            const char* prefix = "__stack";
+            if (kind == ElementKind::Row) {
+                prefix = "__row";
+            }
+            else if (kind == ElementKind::Column) {
+                prefix = "__column";
+            }
+            else if (kind == ElementKind::Rect) {
+                prefix = "__rect";
+            }
+            else if (kind == ElementKind::Polygon) {
+                prefix = "__polygon";
+            }
+            else if (kind == ElementKind::Text) {
+                prefix = "__text";
+            }
+            else if (kind == ElementKind::Image) {
+                prefix = "__image";
+            }
+            return resolveId(std::string(prefix) + "." + std::to_string(generatedId_++));
+        }
+
+        static std::unique_ptr<Node> buildLayoutNode(Element& element, std::vector<std::pair<Element*, Node*>>& links) {
+            auto node = std::make_unique<Node>(element.layoutType());
+            node->setWidth(element.width);
+            node->setHeight(element.height);
+            node->setMargin(element.margin);
+            node->setPadding(element.padding);
+            node->setPosition(element.x, element.y, element.hasX, element.hasY);
+            node->setSpacing(element.spacing);
+            node->setLineSpacing(element.lineSpacing);
+            node->setMainAlign(element.mainAlign);
+            node->setCrossAlign(element.crossAlign);
+            node->setMinWidth(element.minLayoutWidth);
+            node->setMinHeight(element.minLayoutHeight);
+            node->setMaxWidth(element.maxLayoutWidth);
+            node->setMaxHeight(element.maxLayoutHeight);
+            node->setFlexGrow(element.flexGrow);
+            node->setFlexShrink(element.flexShrink);
+
+            Node* raw = node.get();
+            links.push_back({ &element, raw });
+            for (auto& child : element.children) {
+                raw->addChild(buildLayoutNode(*child, links));
+            }
+            return node;
+        }
+
+        std::string pageId_;
+        std::vector<std::unique_ptr<Element>> roots_;
+        std::vector<Element*> stack_;
+        std::unordered_map<std::string, Element*> index_;
+        std::string focusedId_;
+        std::size_t generatedId_ = 0;
+    };
+
+    template <typename Derived>
+    template <typename Fn>
+    Derived& BuilderBase<Derived>::content(Fn&& compose) {
+        ui_->push(element_);
+        std::forward<Fn>(compose)();
+        ui_->pop();
+        return self();
+    }
+
+    template <typename Derived>
+    Derived& BuilderBase<Derived>::visualStateFrom(const std::string& id, float pressedScaleValue) {
+        element_->visualStateSourceId = ui_->resolveId(id);
+        element_->pressedScale = std::clamp(pressedScaleValue, 0.80f, 1.0f);
+        return self();
+    }
+
+    template <typename Derived>
+    Derived& BuilderBase<Derived>::hoverOpacityFrom(const std::string& id, float hiddenOpacity, float visibleOpacity) {
+        element_->hoverOpacitySourceId = ui_->resolveId(id);
+        element_->hoverHiddenOpacity = std::clamp(hiddenOpacity, 0.0f, 1.0f);
+        element_->hoverVisibleOpacity = std::clamp(visibleOpacity, 0.0f, 1.0f);
+        return self();
+    }
+
+} // namespace core::dsl
