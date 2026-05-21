@@ -4,6 +4,7 @@
 .claude
 build-d3d11
 build-opengl
+build-win32
 .vs
 out
 
@@ -11,4 +12,4 @@ out
 # CMakeLists.txt 使用 EUI_DEPS_MODE=auto 时，若这些目录不存在会自动 FetchContent 下载
 3rd/glad/
 3rd/glfw/
-3rd/tray/
+3rd/tray/ 

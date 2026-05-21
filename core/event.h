@@ -89,6 +89,13 @@ namespace core {
             double lastY = 0.0;
             bool lastDown = false;
             bool lastRightDown = false;
+
+            // Win32 模式扩展：由 Win32InputBridge 直接写入当前帧状态
+            bool win32Mode = false;
+            double win32X = 0.0;
+            double win32Y = 0.0;
+            bool win32Down = false;
+            bool win32RightDown = false;
         };
 
         inline std::unordered_map<GLFWwindow*, InputQueue>& inputQueues() {
@@ -137,6 +144,11 @@ namespace core {
 
     inline void installInputCallbacks(GLFWwindow* window) {
         if (!window) {
+            return;
+        }
+
+        // Win32 模式：输入由 Win32InputBridge 直接写入队列，不设置 GLFW 回调
+        if (detail::pointerState(window).win32Mode) {
             return;
         }
 
@@ -314,26 +326,42 @@ namespace core {
 
         double x = 0.0;
         double y = 0.0;
-        glfwGetCursorPos(window, &x, &y);
-        x *= dpiScale;
-        y *= dpiScale;
+        bool down = false;
+        bool rightDown = false;
+
+        if (state.win32Mode) {
+            // Win32 模式：从 Win32InputBridge 写入的状态读取，不调用 GLFW API。
+            // 注意：WM_MOUSEMOVE 的 lParam 已是物理像素客户区坐标，命中测试也用
+            // 物理像素，故此处不再乘 dpiScale（乘了会导致坐标偏移 dpiScale 倍）。
+            x = state.win32X;
+            y = state.win32Y;
+            down = state.win32Down;
+            rightDown = state.win32RightDown;
+        } else {
+            // GLFW 模式：从 GLFW 获取实时光标位置和按键状态
+            glfwGetCursorPos(window, &x, &y);
+            x *= dpiScale;
+            y *= dpiScale;
+            down = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+            rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+        }
 
         PointerEvent event;
         event.x = x;
         event.y = y;
         event.deltaX = x - state.lastX;
         event.deltaY = y - state.lastY;
-        event.down = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-        event.rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-        event.pressedThisFrame = event.down && !state.lastDown;
-        event.releasedThisFrame = !event.down && state.lastDown;
-        event.rightPressedThisFrame = event.rightDown && !state.lastRightDown;
-        event.rightReleasedThisFrame = !event.rightDown && state.lastRightDown;
+        event.down = down;
+        event.rightDown = rightDown;
+        event.pressedThisFrame = down && !state.lastDown;
+        event.releasedThisFrame = !down && state.lastDown;
+        event.rightPressedThisFrame = rightDown && !state.lastRightDown;
+        event.rightReleasedThisFrame = !rightDown && state.lastRightDown;
 
         state.lastX = x;
         state.lastY = y;
-        state.lastDown = event.down;
-        state.lastRightDown = event.rightDown;
+        state.lastDown = down;
+        state.lastRightDown = rightDown;
         return event;
     }
 

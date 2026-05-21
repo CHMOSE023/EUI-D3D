@@ -200,7 +200,7 @@ function(configure_opengl_app target_name)
 
     if(MSVC)
         set_target_properties(${target_name} PROPERTIES VS_GLOBAL_VcpkgXUseBuiltInApplocalDeps true)
-        target_compile_options(${target_name} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/O1> /GS- /sdl-)
+        target_compile_options(${target_name} PRIVATE $<$<NOT:$<CONFIG:Debug>>:/O1> /GS- /sdl- /utf-8)
         target_link_options(${target_name} PRIVATE /OPT:REF /OPT:ICF /ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS)
     elseif(APPLE)
         target_compile_options(${target_name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Os -fno-exceptions -fno-rtti>)
@@ -246,6 +246,23 @@ endfunction()
 file(GLOB APP_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/app/*.cpp")
 foreach(app_source ${APP_SOURCES})
     get_filename_component(app_name "${app_source}" NAME_WE)
-    add_executable(${app_name} main.cpp "${app_source}" ${CORE_SOURCES} ${APP_ICON_RESOURCE})
-    configure_opengl_app(${app_name})
+
+    # 纯 Win32 Demo：不链接框架 main.cpp，app 源文件包含完整的 main() 入口
+    # 这类 demo 名称以 "demo_win32" 开头
+    if(app_name MATCHES "^demo_win32")
+        if(NOT EUI_D3D11)
+            # Win32 Demo 只支持 D3D11 模式
+            message(STATUS "Skipping ${app_name}: requires EUI_D3D11=ON")
+            continue()
+        endif()
+        add_executable(${app_name} "${app_source}" ${CORE_SOURCES} ${APP_ICON_RESOURCE})
+        # 继承标准配置（D3D11 链接、Windows 库等），但注意 ENTRY 点是 main
+        configure_opengl_app(${app_name})
+        # Win32 Demo 需要 imm32 用于 IME 支持
+        target_link_libraries(${app_name} PRIVATE imm32)
+    else()
+        # 标准 App：链接框架 main.cpp
+        add_executable(${app_name} main.cpp "${app_source}" ${CORE_SOURCES} ${APP_ICON_RESOURCE})
+        configure_opengl_app(${app_name})
+    endif()
 endforeach()

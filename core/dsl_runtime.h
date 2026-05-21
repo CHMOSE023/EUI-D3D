@@ -74,7 +74,21 @@ namespace core::dsl {
             installInputCallbacks(window);
             return true;
         }
-#endif
+
+#ifdef _WIN32
+        // 纯 Win32 初始化：不安装 GLFW 回调，光标和 IME 通过 Win32 API 处理
+        // 调用前需先通过 Win32InputBridge::getWindowHandle() 获取 windowHandle
+        // 并将 Win32InputBridge 的 win32Mode 标志设置完成
+        bool initializeWin32(HWND hwnd, core::d3d::WindowSwapChain* sc, GLFWwindow* windowHandle) {
+            swapChain_ = sc;
+            win32Hwnd_ = hwnd;
+            // 不调用 installInputCallbacks：Win32InputBridge 会直接写队列
+            // inputQueue 和 pointerState 在 Win32InputBridge 构造时已经初始化
+            (void)windowHandle;  // 仅作为 map key 使用，已在 Win32InputBridge 中初始化
+            return true;
+        }
+#endif // _WIN32
+#endif // EUI_D3D11
 
         template <typename ComposeFn>
         void compose(const std::string& pageId, float logicalWidth, float logicalHeight, ComposeFn&& composeFn) {
@@ -618,6 +632,25 @@ namespace core::dsl {
         }
 
         void applyCursor(GLFWwindow* window) {
+#ifdef _WIN32
+            if (win32Hwnd_) {
+                // Win32 纯原生模式：使用 Win32 API 设置光标。
+                // 仅当光标位于客户区内才覆盖光标；位于非客户区（边框/标题栏）时
+                // 跳过，让 DefWindowProc 显示缩放/移动等系统光标，否则无法拖拽缩放。
+                POINT pt{};
+                RECT rc{};
+                if (GetCursorPos(&pt) && GetClientRect(win32Hwnd_, &rc)) {
+                    ScreenToClient(win32Hwnd_, &pt);
+                    if (pt.x < rc.left || pt.x >= rc.right ||
+                        pt.y < rc.top || pt.y >= rc.bottom) {
+                        return;  // 在非客户区，交给系统处理光标
+                    }
+                }
+                HCURSOR hCursor = LoadCursor(nullptr, wantsHandCursor_ ? IDC_HAND : IDC_ARROW);
+                SetCursor(hCursor);
+                return;
+            }
+#endif
             if (!arrowCursor_) {
                 arrowCursor_ = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
             }
@@ -633,6 +666,11 @@ namespace core::dsl {
         }
 
         void destroyCursors() {
+#ifdef _WIN32
+            if (win32Hwnd_) {
+                return;  // Win32 模式下光标是系统资源，无需销毁
+            }
+#endif
             if (arrowCursor_) {
                 glfwDestroyCursor(arrowCursor_);
                 arrowCursor_ = nullptr;
@@ -1048,7 +1086,7 @@ namespace core::dsl {
         }
 
         void updateImeCursorRect(GLFWwindow* window, float dpiScale) {
-            if (window == nullptr || focusedId_.empty()) {
+            if (focusedId_.empty()) {
                 return;
             }
 
@@ -1064,6 +1102,25 @@ namespace core::dsl {
                 element->imeRect.height
             };
             const Rect pixelRect = toPixelRect(logicalRect, dpiScale);
+
+#ifdef _WIN32
+            if (win32Hwnd_) {
+                // Win32 纯原生模式：直接使用 HWND 设置 IME 候选框位置
+                HIMC hImc = ImmGetContext(win32Hwnd_);
+                if (hImc) {
+                    COMPOSITIONFORM cf{};
+                    cf.dwStyle = CFS_POINT;
+                    cf.ptCurrentPos.x = static_cast<LONG>(pixelRect.x);
+                    cf.ptCurrentPos.y = static_cast<LONG>(pixelRect.y + pixelRect.height);
+                    ImmSetCompositionWindow(hImc, &cf);
+                    ImmReleaseContext(win32Hwnd_, hImc);
+                }
+                return;
+            }
+#endif
+            if (window == nullptr) {
+                return;
+            }
             core::platform::setImeCursorRect(
                 window,
                 pixelRect.x,
@@ -2068,6 +2125,9 @@ namespace core::dsl {
         GLFWcursor* arrowCursor_ = nullptr;
         GLFWcursor* handCursor_ = nullptr;
         GLFWcursor* currentCursor_ = nullptr;
+#ifdef _WIN32
+        HWND win32Hwnd_ = nullptr;  // 纯 Win32 模式时有效（不使用 GLFW）
+#endif
     };
 
 } // namespace core::dsl
