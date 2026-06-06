@@ -42,6 +42,14 @@ namespace core {
         static bool consumeRemoteImageReady();
         static void releaseCachedTextures();
 
+#ifdef EUI_D3D11
+        // Register / unregister an externally-managed SRV so that
+        // ui.image().source(key) can display an offscreen render target.
+        // The caller retains ownership; the SRV must remain valid until unregistered.
+        static void registerExternalSRV(const std::string& key,  ID3D11ShaderResourceView* srv, int width, int height);
+        static void unregisterExternalSRV(const std::string& key);
+#endif
+
     private:
         struct SharedResources;
 

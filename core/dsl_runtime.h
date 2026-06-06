@@ -907,6 +907,26 @@ namespace core::dsl {
             else if (element.kind == ElementKind::Image) {
                 updateImage(element, deltaSeconds, ancestorFrameChanged);
             }
+#ifdef EUI_D3D11
+            else if (element.kind == ElementKind::Canvas) {
+                // A Canvas element with an active render callback drives
+                // continuous rendering:
+                //   - animating_  : keeps the main loop in glfwPollEvents()
+                //                   at the configured frame rate (~60 fps)
+                //                   instead of blocking in glfwWaitEvents().
+                //   - fullRedraw_ : the canvas paints dynamic 3-D content that
+                //                   the dirty-rect cache cannot track. Without
+                //                   this, renderD3D() would just re-blit the
+                //                   stale cached frame (dirtyRects empty &&
+                //                   !fullRedraw_) and the canvas would appear
+                //                   frozen even though its state is updating.
+                if (element.onD3DRender) {
+                    animating_   = true;
+                    needsRender_ = true;
+                    fullRedraw_  = true;
+                }
+            }
+#endif
 
             const bool childAncestorFrameChanged = ancestorFrameChanged || frameTargetChanged;
             const std::vector<const Element*> children = orderedElements(element.children);
@@ -1902,6 +1922,19 @@ namespace core::dsl {
                     renderImage(element, windowWidth, windowHeight, dpiScale, renderTransform);
                 }
             }
+#ifdef EUI_D3D11
+            else if (element.kind == ElementKind::Canvas) {
+                if (element.onD3DRender) {
+                    const Rect pixelFrame = applyRenderTransform(
+                        toPixelRect(element.frame, dpiScale), renderTransform);
+                    if (pixelFrame.width > 0.5f && pixelFrame.height > 0.5f &&
+                        (!dirtyRect || intersects(pixelFrame, *dirtyRect)) &&
+                        (!effectiveHasScissor || intersects(pixelFrame, effectiveScissor))) {
+                        renderCanvas(element, windowWidth, windowHeight, pixelFrame);
+                    }
+                }
+            }
+#endif
 
             const std::vector<const Element*> children = orderedElements(element.children);
             for (const Element* child : children) {
@@ -2091,6 +2124,47 @@ namespace core::dsl {
             instance.primitive->setFit(instance.fit);
             instance.primitive->render(windowWidth, windowHeight);
         }
+
+#ifdef EUI_D3D11
+        // renderCanvas — call the user's D3D11 render callback, then restore
+        // the pipeline state that the callback is allowed to change:
+        //   - viewport (callback may have changed it to the element's sub-rect)
+        //   - render target bindings (callback may have attached a depth buffer)
+        //   - blend / depth-stencil / rasterizer states
+        //   - primitive topology
+        void renderCanvas(const Element& element, int windowWidth, int windowHeight,
+                          const Rect& pixelFrame) {
+            if (!element.onD3DRender) return;
+            auto& g = core::d3d::globalCtx();
+            ID3D11DeviceContext* ctx = g.ctx.Get();
+
+            // Save the current render target so we can restore it after the callback
+            // (the callback typically attaches its own depth-stencil alongside the RTV).
+            ComPtr<ID3D11RenderTargetView> savedRTV;
+            ctx->OMGetRenderTargets(1, &savedRTV, nullptr);
+
+            // Invoke the user's rendering callback
+            element.onD3DRender(ctx, pixelFrame);
+
+            // ---- Restore pipeline state ----
+            // RTV without depth (UI render pass doesn't use depth)
+            if (savedRTV) {
+                ID3D11RenderTargetView* rtvPtr = savedRTV.Get();
+                ctx->OMSetRenderTargets(1, &rtvPtr, nullptr);
+            }
+            // Full-window viewport
+            D3D11_VIEWPORT vp{};
+            vp.Width    = static_cast<float>(windowWidth);
+            vp.Height   = static_cast<float>(windowHeight);
+            vp.MaxDepth = 1.0f;
+            ctx->RSSetViewports(1, &vp);
+            // Blend / depth / rasterizer states matching the UI render pass
+            ctx->OMSetBlendState(g.blendState.Get(), nullptr, 0xFFFFFFFF);
+            ctx->OMSetDepthStencilState(nullptr, 0);
+            ctx->RSSetState(g.rasterScissorOff.Get());
+            ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        }
+#endif
 
         Ui ui_;
         std::unordered_map<std::string, RectInstance> rects_;

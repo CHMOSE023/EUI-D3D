@@ -36,14 +36,14 @@
 #include <string>
 #include <vector>
 
-// ─────────────────────────────────────────────────────────────
-// 全局 EUI / Win32 状态
-// ─────────────────────────────────────────────────────────────
+ // ─────────────────────────────────────────────────────────────
+ // 全局 EUI / Win32 状态
+ // ─────────────────────────────────────────────────────────────
 
 static std::unique_ptr<core::Win32InputBridge>  g_bridge;
 static std::unique_ptr<core::dsl::Runtime>      g_runtime;
 static core::d3d::WindowSwapChain               g_swapChain;
-static HWND                                     g_hwnd      = nullptr;
+static HWND                                     g_hwnd = nullptr;
 static bool                                     g_needsRender = true;
 
 // ─────────────────────────────────────────────────────────────
@@ -62,34 +62,34 @@ static std::vector<DocTab> g_tabs = {
     { "t3", "Settings",   2 },
 };
 static int g_activeTabIdx = 0;
-static int g_nextTabSeq   = 4;   // 下一个新建 tab 的序号
+static int g_nextTabSeq = 4;   // 下一个新建 tab 的序号
 
 // ─────────────────────────────────────────────────────────────
 // 应用状态
 // ─────────────────────────────────────────────────────────────
 
-static int         g_menuOpen   = -1;   // 哪个菜单项打开 (-1=关闭)
+static int         g_menuOpen = -1;   // 哪个菜单项打开 (-1=关闭)
 static int         g_clickCount = 0;
-static std::string g_statusMsg  = "Ready";
+static std::string g_statusMsg = "Ready";
 
 // ─────────────────────────────────────────────────────────────
 // 布局常量（逻辑像素）
 // ─────────────────────────────────────────────────────────────
 
-static constexpr float kMenuH    = 32.0f;
+static constexpr float kMenuH = 32.0f;
 static constexpr float kToolbarH = 46.0f;
-static constexpr float kTabsH    = 40.0f;
-static constexpr float kHeaderH  = kMenuH + kToolbarH + kTabsH;  // 118
-static constexpr float kStatusH  = 26.0f;
+static constexpr float kTabsH = 40.0f;
+static constexpr float kHeaderH = kMenuH + kToolbarH + kTabsH;  // 118
+static constexpr float kStatusH = 26.0f;
 
 // ─────────────────────────────────────────────────────────────
 // 菜单栏数据
 // ─────────────────────────────────────────────────────────────
 
 static constexpr int kMenuCount = 4;
-static const char*   kMenuLabels[kMenuCount] = { "File", "Edit", "View", "Help" };
-static const float   kMenuX[kMenuCount]      = { 0.0f, 60.0f, 120.0f, 180.0f };
-static const float   kMenuW[kMenuCount]      = { 60.0f, 60.0f, 60.0f, 60.0f };
+static const char* kMenuLabels[kMenuCount] = { "File", "Edit", "View", "Help" };
+static const float   kMenuX[kMenuCount] = { 0.0f, 60.0f, 120.0f, 180.0f };
+static const float   kMenuW[kMenuCount] = { 60.0f, 60.0f, 60.0f, 60.0f };
 
 static const std::vector<std::string> kMenuItems[kMenuCount] = {
     { "New",    "Open",   "Save",     "Save As", "Exit"       },
@@ -103,7 +103,7 @@ static const std::vector<std::string> kMenuItems[kMenuCount] = {
 // ─────────────────────────────────────────────────────────────
 
 struct ToolBtn {
-    const char*  name;
+    const char* name;
     unsigned int icon;   // Font Awesome codepoint
     float        x;
     bool         sepAfter;
@@ -124,16 +124,16 @@ static const ToolBtn kToolBtns[] = {
     { "Paste", 0xF0EA, 318.0f, false },
 };
 static constexpr int   kToolBtnCount = 8;
-static constexpr float kToolBtnSz    = 36.0f;
+static constexpr float kToolBtnSz = 36.0f;
 
 // ─────────────────────────────────────────────────────────────
 // 辅助：绝对定位文字（水平 Left，垂直 Center）
 // ─────────────────────────────────────────────────────────────
 
 static void label(core::dsl::Ui& ui, const std::string& id,
-                  float x, float y, float w, float h,
-                  const std::string& text, float fontSize,
-                  const core::Color& color, int weight = 400) {
+    float x, float y, float w, float h,
+    const std::string& text, float fontSize,
+    const core::Color& color, int weight = 400) {
     ui.text(id)
         .x(x).y(y).size(w, h)
         .text(text).fontSize(fontSize).fontWeight(weight)
@@ -155,10 +155,10 @@ static void buildMenuBar(core::dsl::Ui& ui, float W) {
         .color({ 0.22f, 0.22f, 0.26f, 1.0f }).build();
 
     for (int i = 0; i < kMenuCount; ++i) {
-        const bool isOpen    = (g_menuOpen == i);
+        const bool isOpen = (g_menuOpen == i);
         const Color activeBg = { 0.18f, 0.30f, 0.56f, 1.0f };
         const Color normalBg = isOpen ? activeBg : Color{ 0,0,0,0 };
-        const Color hoverBg  = isOpen ? activeBg : Color{ 1,1,1,0.09f };
+        const Color hoverBg = isOpen ? activeBg : Color{ 1,1,1,0.09f };
 
         // 可点击背景矩形
         ui.rect("mb.item." + std::to_string(i))
@@ -166,9 +166,9 @@ static void buildMenuBar(core::dsl::Ui& ui, float W) {
             .states(normalBg, hoverBg, { 0.15f, 0.26f, 0.50f, 1.0f })
             .radius(4.0f)
             .onClick([i] {
-                g_menuOpen = (g_menuOpen == i) ? -1 : i;
-                g_needsRender = true;
-            })
+            g_menuOpen = (g_menuOpen == i) ? -1 : i;
+            g_needsRender = true;
+                })
             .build();
 
         // 标签文字：水平 Center + 垂直 Center
@@ -176,9 +176,9 @@ static void buildMenuBar(core::dsl::Ui& ui, float W) {
             .x(kMenuX[i]).y(0).size(kMenuW[i], kMenuH)
             .text(kMenuLabels[i])
             .fontSize(15.0f)
-            .lineHeight(kMenuH)
+            //.lineHeight(kMenuH)
             .color(isOpen ? Color{ 0.96f, 0.97f, 1.0f, 1.0f }
-                          : Color{ 0.80f, 0.83f, 0.88f, 1.0f })
+                : Color{ 0.80f, 0.83f, 0.88f, 1.0f })
             .horizontalAlign(core::HorizontalAlign::Center)
             .verticalAlign(core::VerticalAlign::Center)
             .build();
@@ -190,10 +190,10 @@ static void buildMenuBar(core::dsl::Ui& ui, float W) {
 // ─────────────────────────────────────────────────────────────
 
 static void buildToolbar(core::dsl::Ui& ui, float W) {
-    const float tbY   = kMenuH;
-    const float btnY  = tbY + (kToolbarH - kToolBtnSz) * 0.5f;
-    const float sepH  = kToolbarH - 20.0f;
-    const float sepY  = tbY + 10.0f;
+    const float tbY = kMenuH;
+    const float btnY = tbY + (kToolbarH - kToolBtnSz) * 0.5f;
+    const float sepH = kToolbarH - 20.0f;
+    const float sepY = tbY + 10.0f;
 
     ui.rect("tb.bg").y(tbY).size(W, kToolbarH)
         .color({ 0.12f, 0.12f, 0.14f, 1.0f }).build();
@@ -203,31 +203,31 @@ static void buildToolbar(core::dsl::Ui& ui, float W) {
     for (int i = 0; i < kToolBtnCount; ++i) {
         const ToolBtn& b = kToolBtns[i];
         std::string btnName = b.name;
-        unsigned int ic     = b.icon;
+        unsigned int ic = b.icon;
         float bx = b.x;
 
         ui.stack("tb.s." + btnName)
             .x(bx).y(btnY).size(kToolBtnSz, kToolBtnSz)
             .content([&, btnName, ic] {
-                components::button(ui, "tb.btn." + btnName)
-                    .size(kToolBtnSz, kToolBtnSz)
-                    .text("")            // 纯图标，无文字
-                    .icon(ic)
-                    .iconSize(16.0f)
-                    .radius(7.0f)
-                    .colors(
-                        { 0.0f, 0.0f, 0.0f, 0.0f },
-                        { 1.0f, 1.0f, 1.0f, 0.10f },
-                        { 1.0f, 1.0f, 1.0f, 0.18f }
-                    )
-                    .iconColor({ 0.72f, 0.76f, 0.82f, 1.0f })
-                    .transition(0.08f)
-                    .onClick([btnName] {
-                        g_statusMsg   = btnName;
-                        g_needsRender = true;
+            components::button(ui, "tb.btn." + btnName)
+                .size(kToolBtnSz, kToolBtnSz)
+                .text(" ")            // 纯图标，无文字
+                .icon(ic)
+                .iconSize(16.0f)
+                .radius(3.0f)
+                .colors(
+                    { 0.0f, 0.0f, 0.0f, 0.0f },
+                    { 1.0f, 1.0f, 1.0f, 0.10f },
+                    { 1.0f, 1.0f, 1.0f, 0.18f }
+                )
+                .iconColor({ 0.72f, 0.76f, 0.82f, 1.0f })
+                .transition(0.08f)
+                .onClick([btnName] {
+                g_statusMsg = btnName;
+                g_needsRender = true;
                     })
-                    .build();
-            });
+                .build();
+                });
 
         // 组间竖线
         if (b.sepAfter) {
@@ -259,27 +259,27 @@ static void buildTabsBar(core::dsl::Ui& ui, float W) {
     const int tabCount = static_cast<int>(g_tabs.size());
 
     for (int i = 0; i < tabCount; ++i) {
-        const std::string tid  = g_tabs[i].id;
+        const std::string tid = g_tabs[i].id;
         const std::string titl = g_tabs[i].title;
         const float tx = static_cast<float>(i) * tabW;
         const bool  active = (i == g_activeTabIdx);
 
         // 背景：整个 tab 区域可点击（选中该 tab）
-        const Color bgNorm  = active ? Color{ 0.17f, 0.17f, 0.20f, 1.0f }
-                                     : Color{ 0.0f,  0.0f,  0.0f,  0.0f };
-        const Color bgHov   = active ? bgNorm
-                                     : Color{ 1.0f,  1.0f,  1.0f,  0.05f };
+        const Color bgNorm = active ? Color{ 0.17f, 0.17f, 0.20f, 1.0f }
+        : Color{ 0.0f,  0.0f,  0.0f,  0.0f };
+        const Color bgHov = active ? bgNorm
+            : Color{ 1.0f,  1.0f,  1.0f,  0.05f };
 
         ui.rect("tab.bg." + tid)
             .x(tx).y(tabY).size(tabW, tabH)
             .states(bgNorm, bgHov, bgNorm)
             .onClick([i, tid] {
-                // 找到 tab（可能因关闭而 index 变动，按 id 定位）
-                for (int j = 0; j < (int)g_tabs.size(); ++j) {
-                    if (g_tabs[j].id == tid) { g_activeTabIdx = j; break; }
-                }
-                g_needsRender = true;
-            })
+            // 找到 tab（可能因关闭而 index 变动，按 id 定位）
+            for (int j = 0; j < (int)g_tabs.size(); ++j) {
+                if (g_tabs[j].id == tid) { g_activeTabIdx = j; break; }
+            }
+            g_needsRender = true;
+                })
             .build();
 
         // 活跃指示线（底部蓝色条）
@@ -304,7 +304,7 @@ static void buildTabsBar(core::dsl::Ui& ui, float W) {
             .text(titl).fontSize(14.0f)
             .lineHeight(tabH)
             .color(active ? Color{ 0.94f, 0.96f, 1.0f, 1.0f }
-                          : Color{ 0.55f, 0.58f, 0.64f, 1.0f })
+                : Color{ 0.55f, 0.58f, 0.64f, 1.0f })
             .verticalAlign(core::VerticalAlign::Center)
             .build();
 
@@ -315,18 +315,18 @@ static void buildTabsBar(core::dsl::Ui& ui, float W) {
             .states({ 0,0,0,0 }, { 1,1,1,0.14f }, { 1,1,1,0.22f })
             .radius(4.0f)
             .onClick([tid] {
-                auto it = std::find_if(g_tabs.begin(), g_tabs.end(),
-                    [&tid](const DocTab& t) { return t.id == tid; });
-                if (it != g_tabs.end() && g_tabs.size() > 1) {
-                    int idx = (int)(it - g_tabs.begin());
-                    g_tabs.erase(it);
-                    if (g_activeTabIdx >= (int)g_tabs.size())
-                        g_activeTabIdx = (int)g_tabs.size() - 1;
-                    else if (g_activeTabIdx > idx)
-                        --g_activeTabIdx;
-                }
-                g_needsRender = true;
-            })
+            auto it = std::find_if(g_tabs.begin(), g_tabs.end(),
+                [&tid](const DocTab& t) { return t.id == tid; });
+            if (it != g_tabs.end() && g_tabs.size() > 1) {
+                int idx = (int)(it - g_tabs.begin());
+                g_tabs.erase(it);
+                if (g_activeTabIdx >= (int)g_tabs.size())
+                    g_activeTabIdx = (int)g_tabs.size() - 1;
+                else if (g_activeTabIdx > idx)
+                    --g_activeTabIdx;
+            }
+            g_needsRender = true;
+                })
             .build();
 
         // × 号文字（覆盖在关闭按钮矩形上方，无 onClick → 点击穿透到下方矩形）
@@ -336,7 +336,7 @@ static void buildTabsBar(core::dsl::Ui& ui, float W) {
             .fontSize(14.0f)
             .lineHeight(tabH - 12.0f)
             .color(active ? Color{ 0.60f, 0.63f, 0.70f, 1.0f }
-                          : Color{ 0.36f, 0.38f, 0.42f, 1.0f })
+                : Color{ 0.36f, 0.38f, 0.42f, 1.0f })
             .horizontalAlign(core::HorizontalAlign::Center)
             .verticalAlign(core::VerticalAlign::Center)
             .build();
@@ -349,12 +349,12 @@ static void buildTabsBar(core::dsl::Ui& ui, float W) {
         .x(addX).y(tabY).size(40.0f, tabH)
         .states({ 0,0,0,0 }, { 1,1,1,0.07f }, { 1,1,1,0.13f })
         .onClick([] {
-            int seq = g_nextTabSeq++;
-            g_tabs.push_back({ "t" + std::to_string(seq),
-                               "Document " + std::to_string(seq), 0 });
-            g_activeTabIdx = (int)g_tabs.size() - 1;
-            g_needsRender  = true;
-        })
+        int seq = g_nextTabSeq++;
+        g_tabs.push_back({ "t" + std::to_string(seq),
+                           "Document " + std::to_string(seq), 0 });
+        g_activeTabIdx = (int)g_tabs.size() - 1;
+        g_needsRender = true;
+            })
         .build();
 
     ui.text("tab.add.lbl")
@@ -374,7 +374,7 @@ static void buildTabsBar(core::dsl::Ui& ui, float W) {
 
 static void buildDocumentsTab(core::dsl::Ui& ui, float W, float contentH) {
     using core::Color;
-    const float M     = 28.0f;
+    const float M = 28.0f;
     const float cardW = 440.0f;
 
     // 卡片1：点击计数
@@ -382,35 +382,35 @@ static void buildDocumentsTab(core::dsl::Ui& ui, float W, float contentH) {
     ui.rect("doc.c1.bg").x(M).y(c1y).size(cardW, c1h)
         .color({ 0.14f, 0.14f, 0.16f, 1.0f }).radius(8.0f).build();
     label(ui, "doc.c1.hd", M + 16.0f, c1y + 10.0f, 240.0f, 24.0f,
-          "Click Counter", 16.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, 600);
+        "Click Counter", 16.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, 600);
 
     ui.stack("doc.c1.btn").x(M + 16.0f).y(c1y + 48.0f).size(120.0f, 36.0f).content([&] {
         components::button(ui, "doc.btn.click")
             .size(120.0f, 36.0f).text("Click Me").fontSize(14.0f).radius(7.0f)
             .onClick([] { ++g_clickCount; g_needsRender = true; })
             .build();
-    });
+        });
     label(ui, "doc.c1.cnt",
-          M + 150.0f, c1y + 48.0f, 260.0f, 36.0f,
-          "Count:  " + std::to_string(g_clickCount),
-          15.0f, { 0.82f, 0.82f, 0.82f, 1.0f });
+        M + 150.0f, c1y + 48.0f, 260.0f, 36.0f,
+        "Count:  " + std::to_string(g_clickCount),
+        15.0f, { 0.82f, 0.82f, 0.82f, 1.0f });
 
     // 卡片2：窗口信息
     const float c2y = 134.0f, c2h = 90.0f;
     ui.rect("doc.c2.bg").x(M).y(c2y).size(cardW, c2h)
         .color({ 0.14f, 0.14f, 0.16f, 1.0f }).radius(8.0f).build();
     label(ui, "doc.c2.hd", M + 16.0f, c2y + 8.0f, 240.0f, 24.0f,
-          "Window Info", 16.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, 600);
+        "Window Info", 16.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, 600);
 
     if (g_bridge) {
         char buf[128];
         std::snprintf(buf, sizeof(buf), "Size:  %d × %d  px",
-                      g_bridge->getWidth(), g_bridge->getHeight());
-        label(ui, "doc.c2.sz",  M + 16.0f, c2y + 40.0f, 380.0f, 20.0f,
-              buf, 13.5f, { 0.70f, 0.70f, 0.70f, 1.0f });
+            g_bridge->getWidth(), g_bridge->getHeight());
+        label(ui, "doc.c2.sz", M + 16.0f, c2y + 40.0f, 380.0f, 20.0f,
+            buf, 13.5f, { 0.70f, 0.70f, 0.70f, 1.0f });
         std::snprintf(buf, sizeof(buf), "DPI Scale:  %.2f", g_bridge->getDpiScale());
         label(ui, "doc.c2.dpi", M + 16.0f, c2y + 64.0f, 380.0f, 20.0f,
-              buf, 13.5f, { 0.70f, 0.70f, 0.70f, 1.0f });
+            buf, 13.5f, { 0.70f, 0.70f, 0.70f, 1.0f });
     }
 
     // 卡片3：说明
@@ -418,7 +418,7 @@ static void buildDocumentsTab(core::dsl::Ui& ui, float W, float contentH) {
     ui.rect("doc.c3.bg").x(M).y(c3y).size(cardW, c3h)
         .color({ 0.10f, 0.12f, 0.18f, 1.0f }).radius(8.0f).build();
     label(ui, "doc.c3.hd", M + 16.0f, c3y + 10.0f, 300.0f, 24.0f,
-          "Usage Guide", 16.0f, { 0.50f, 0.74f, 1.0f, 1.0f }, 600);
+        "Usage Guide", 16.0f, { 0.50f, 0.74f, 1.0f, 1.0f }, 600);
 
     static const char* tips[] = {
         "Menu bar   ->  File / Edit / View / Help dropdowns",
@@ -429,8 +429,8 @@ static void buildDocumentsTab(core::dsl::Ui& ui, float W, float contentH) {
     };
     for (int i = 0; i < 5; ++i) {
         label(ui, "doc.c3.tip." + std::to_string(i),
-              M + 16.0f, c3y + 42.0f + i * 22.0f, 400.0f, 20.0f,
-              tips[i], 13.0f, { 0.62f, 0.74f, 0.94f, 1.0f });
+            M + 16.0f, c3y + 42.0f + i * 22.0f, 400.0f, 20.0f,
+            tips[i], 13.0f, { 0.62f, 0.74f, 0.94f, 1.0f });
     }
 }
 
@@ -440,18 +440,18 @@ static void buildDocumentsTab(core::dsl::Ui& ui, float W, float contentH) {
 
 static void buildImagesTab(core::dsl::Ui& ui, float W, float contentH) {
     using core::Color;
-    const float M     = 28.0f;
+    const float M = 28.0f;
     const float cardY = 18.0f;
 
     // 左侧：应用图标
     const float iconCardW = 230.0f;
-    const float imgSz     = iconCardW - 28.0f;
+    const float imgSz = iconCardW - 28.0f;
     const float iconCardH = imgSz + 60.0f;
 
     ui.rect("img.icon.card").x(M).y(cardY).size(iconCardW, iconCardH)
         .color({ 0.14f, 0.14f, 0.16f, 1.0f }).radius(12.0f).build();
     label(ui, "img.icon.hd", M + 14.0f, cardY + 10.0f, iconCardW - 28.0f, 22.0f,
-          "App Icon", 14.5f, { 0.62f, 0.65f, 0.70f, 1.0f }, 500);
+        "App Icon", 14.5f, { 0.62f, 0.65f, 0.70f, 1.0f }, 500);
 
     ui.image("img.icon.img")
         .x(M + 14.0f).y(cardY + 38.0f)
@@ -462,8 +462,8 @@ static void buildImagesTab(core::dsl::Ui& ui, float W, float contentH) {
         .build();
 
     label(ui, "img.icon.sub",
-          M + 14.0f, cardY + iconCardH - 26.0f, iconCardW - 28.0f, 20.0f,
-          "icon.png (local)", 12.0f, { 0.42f, 0.44f, 0.48f, 1.0f });
+        M + 14.0f, cardY + iconCardH - 26.0f, iconCardW - 28.0f, 20.0f,
+        "icon.png (local)", 12.0f, { 0.42f, 0.44f, 0.48f, 1.0f });
 
     // 右侧：Bing Daily 壁纸
     const float bingX = M + iconCardW + 18.0f;
@@ -473,7 +473,7 @@ static void buildImagesTab(core::dsl::Ui& ui, float W, float contentH) {
     ui.rect("img.bing.card").x(bingX).y(cardY).size(bingW, bingH)
         .color({ 0.14f, 0.14f, 0.16f, 1.0f }).radius(12.0f).build();
     label(ui, "img.bing.hd", bingX + 14.0f, cardY + 10.0f, bingW - 28.0f, 22.0f,
-          "Bing Daily Wallpaper", 14.5f, { 0.62f, 0.65f, 0.70f, 1.0f }, 500);
+        "Bing Daily Wallpaper", 14.5f, { 0.62f, 0.65f, 0.70f, 1.0f }, 500);
 
     // 占位背景（加载前可见）
     ui.rect("img.bing.ph")
@@ -490,13 +490,13 @@ static void buildImagesTab(core::dsl::Ui& ui, float W, float contentH) {
         .build();
 
     label(ui, "img.bing.sub",
-          bingX + 14.0f, cardY + bingH - 26.0f, bingW - 28.0f, 20.0f,
-          "Fetched asynchronously from Bing", 12.0f, { 0.42f, 0.44f, 0.48f, 1.0f });
+        bingX + 14.0f, cardY + bingH - 26.0f, bingW - 28.0f, 20.0f,
+        "Fetched asynchronously from Bing", 12.0f, { 0.42f, 0.44f, 0.48f, 1.0f });
 
     label(ui, "img.note",
-          M, cardY + bingH + 16.0f, W - M * 2.0f, 20.0f,
-          "ui.image().source(\"path\")  for local   |   .bingDaily()  for network fetch",
-          13.0f, { 0.36f, 0.40f, 0.46f, 1.0f });
+        M, cardY + bingH + 16.0f, W - M * 2.0f, 20.0f,
+        "ui.image().source(\"path\")  for local   |   .bingDaily()  for network fetch",
+        13.0f, { 0.36f, 0.40f, 0.46f, 1.0f });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -517,7 +517,7 @@ static void buildSettingsTab(core::dsl::Ui& ui, float W, float contentH) {
         "Font Awesome 7  —  icon font support",
     };
     static constexpr int featureCount = 6;
-    const float rowH  = 28.0f;
+    const float rowH = 28.0f;
     const float cardW = 460.0f;
     const float cardY = 18.0f;
     const float cardH = 50.0f + featureCount * rowH;
@@ -525,13 +525,13 @@ static void buildSettingsTab(core::dsl::Ui& ui, float W, float contentH) {
     ui.rect("set.feat.bg").x(M).y(cardY).size(cardW, cardH)
         .color({ 0.10f, 0.14f, 0.10f, 1.0f }).radius(10.0f).build();
     label(ui, "set.feat.hd", M + 16.0f, cardY + 10.0f, 300.0f, 26.0f,
-          "Features", 17.0f, { 0.44f, 0.90f, 0.44f, 1.0f }, 600);
+        "Features", 17.0f, { 0.44f, 0.90f, 0.44f, 1.0f }, 600);
 
     for (int i = 0; i < featureCount; ++i) {
         label(ui, "set.feat." + std::to_string(i),
-              M + 16.0f, cardY + 44.0f + i * rowH, cardW - 32.0f, 24.0f,
-              std::string("+  ") + features[i],
-              13.5f, { 0.68f, 0.86f, 0.68f, 1.0f });
+            M + 16.0f, cardY + 44.0f + i * rowH, cardW - 32.0f, 24.0f,
+            std::string("+  ") + features[i],
+            13.5f, { 0.68f, 0.86f, 0.68f, 1.0f });
     }
 
     // 主题色板
@@ -540,7 +540,7 @@ static void buildSettingsTab(core::dsl::Ui& ui, float W, float contentH) {
     ui.rect("set.pal.bg").x(M).y(palY).size(cardW, palH)
         .color({ 0.14f, 0.14f, 0.16f, 1.0f }).radius(10.0f).build();
     label(ui, "set.pal.hd", M + 16.0f, palY + 10.0f, 200.0f, 24.0f,
-          "Theme Palette", 17.0f, { 0.84f, 0.84f, 0.90f, 1.0f }, 600);
+        "Theme Palette", 17.0f, { 0.84f, 0.84f, 0.90f, 1.0f }, 600);
 
     static const Color palette[] = {
         { 0.22f, 0.44f, 0.88f, 1.0f },
@@ -569,7 +569,7 @@ static void buildStatusBar(core::dsl::Ui& ui, float W, float H) {
     ui.rect("sts.line").y(y).size(W, 1.0f)
         .color({ 0.22f, 0.22f, 0.26f, 1.0f }).build();
     label(ui, "sts.txt", 14.0f, y, W - 28.0f, kStatusH,
-          g_statusMsg, 13.5f, { 0.52f, 0.55f, 0.60f, 1.0f });
+        g_statusMsg, 13.5f, { 0.52f, 0.55f, 0.60f, 1.0f });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -585,19 +585,20 @@ static void buildContextMenus(core::dsl::Ui& ui, float W, float H) {
             .items(kMenuItems[i])
             .open(g_menuOpen == i)
             .onSelect([i](int idx) {
-                if (i == 0 && idx == 4) {
-                    PostQuitMessage(0);
-                } else {
-                    g_statusMsg = std::string(kMenuLabels[i]) +
-                                  " > " + kMenuItems[i][idx];
-                }
-                g_menuOpen  = -1;
-                g_needsRender = true;
-            })
+            if (i == 0 && idx == 4) {
+                PostQuitMessage(0);
+            }
+            else {
+                g_statusMsg = std::string(kMenuLabels[i]) +
+                    " > " + kMenuItems[i][idx];
+            }
+            g_menuOpen = -1;
+            g_needsRender = true;
+                })
             .onDismiss([] {
-                g_menuOpen  = -1;
-                g_needsRender = true;
-            })
+            g_menuOpen = -1;
+            g_needsRender = true;
+                })
             .build();
     }
 }
@@ -607,8 +608,8 @@ static void buildContextMenus(core::dsl::Ui& ui, float W, float H) {
 // ─────────────────────────────────────────────────────────────
 
 static void composeUI(core::dsl::Ui& ui, const core::dsl::Screen& screen) {
-    const float W        = screen.width;
-    const float H        = screen.height;
+    const float W = screen.width;
+    const float H = screen.height;
     const float contentH = H - kHeaderH - kStatusH;
 
     ui.stack("root").size(W, H).content([&] {
@@ -626,18 +627,18 @@ static void composeUI(core::dsl::Ui& ui, const core::dsl::Screen& screen) {
             .size(W, contentH > 0.0f ? contentH : 0.0f).content([&] {
             if (!g_tabs.empty()) {
                 const int vt = g_tabs[g_activeTabIdx].viewType;
-                if      (vt == 0) buildDocumentsTab(ui, W, contentH);
+                if (vt == 0) buildDocumentsTab(ui, W, contentH);
                 else if (vt == 1) buildImagesTab(ui, W, contentH);
                 else              buildSettingsTab(ui, W, contentH);
             }
-        });
+                });
 
         // 状态栏
         buildStatusBar(ui, W, H);
 
         // 下拉菜单（最顶层）
         buildContextMenus(ui, W, H);
-    });
+        });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -649,9 +650,11 @@ static std::chrono::high_resolution_clock::time_point g_lastFrame;
 static void renderFrame(bool force) {
     if (!g_runtime || !g_bridge || !g_swapChain.swapChain) return;
 
+    const bool shouldAlwaysRender = (g_menuOpen >= 0);
+
     RECT rc{};
     GetClientRect(g_hwnd, &rc);
-    const int fbW = rc.right  - rc.left;
+    const int fbW = rc.right - rc.left;
     const int fbH = rc.bottom - rc.top;
     if (fbW <= 0 || fbH <= 0) return;
 
@@ -661,11 +664,11 @@ static void renderFrame(bool force) {
         g_needsRender = true;
     }
 
-    const auto  now   = std::chrono::high_resolution_clock::now();
+    const auto  now = std::chrono::high_resolution_clock::now();
     const float delta = std::chrono::duration<float>(now - g_lastFrame).count();
     g_lastFrame = now;
 
-    const float dpi      = g_bridge->getDpiScale();
+    const float dpi = g_bridge->getDpiScale();
     const float ptrScale = g_bridge->getPointerScale();
 
     if (g_runtime->update(g_bridge->getWindowHandle(), delta, ptrScale, dpi))
@@ -673,7 +676,7 @@ static void renderFrame(bool force) {
     if (core::async::dispatchReady())
         g_needsRender = true;
 
-    if (g_needsRender || force) {
+    if (g_needsRender || force || shouldAlwaysRender) {
         const float logW = static_cast<float>(fbW) / dpi;
         const float logH = static_cast<float>(fbH) / dpi;
         g_runtime->compose("main", logW, logH,
@@ -741,11 +744,11 @@ int main() {
     HINSTANCE hInst = GetModuleHandleW(nullptr);
 
     WNDCLASSW wc{};
-    wc.lpfnWndProc   = WndProc;
-    wc.hInstance     = hInst;
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInst;
     wc.lpszClassName = L"EUIDemoWin32Class";
-    wc.hCursor       = LoadCursor(nullptr, IDC_ARROW);
-    wc.style         = CS_VREDRAW | CS_HREDRAW;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.style = CS_VREDRAW | CS_HREDRAW;
     RegisterClassW(&wc);
 
     HWND hwnd = CreateWindowExW(
@@ -774,7 +777,7 @@ int main() {
     }
     RECT clientRect{};
     GetClientRect(hwnd, &clientRect);
-    const int fbW = clientRect.right  - clientRect.left;
+    const int fbW = clientRect.right - clientRect.left;
     const int fbH = clientRect.bottom - clientRect.top;
     g_swapChain = core::d3d::createSwapChain(hwnd, fbW, fbH);
     core::d3d::setCurrentSwapChain(&g_swapChain);
@@ -794,10 +797,10 @@ int main() {
 
     // 主消息循环
     MSG msg{};
-    bool running    = true;
-    g_lastFrame     = std::chrono::high_resolution_clock::now();
+    bool running = true;
+    g_lastFrame = std::chrono::high_resolution_clock::now();
     int  frameCount = 0;
-    auto lastFpsTp  = g_lastFrame;
+    auto lastFpsTp = g_lastFrame;
 
     while (running) {
         while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -818,9 +821,16 @@ int main() {
         renderFrame(false);
         if (willRender) ++frameCount;
 
-        if (!g_needsRender) WaitMessage();
+        // 改进：菜单打开时不要阻塞
+        if (!g_needsRender && g_menuOpen < 0) {
+            WaitMessage();
+        }
+        else if (!g_needsRender) {
+            // 菜单打开时，用短超时而不是无限等待
+            MsgWaitForMultipleObjects(0, nullptr, FALSE, 16, QS_ALLEVENTS);
+        }
 
-        const auto  now2  = std::chrono::high_resolution_clock::now();
+        const auto  now2 = std::chrono::high_resolution_clock::now();
         const float fpsDt = std::chrono::duration<float>(now2 - lastFpsTp).count();
         if (fpsDt >= 1.0f) {
             const float fps = static_cast<float>(frameCount) / fpsDt;
@@ -829,7 +839,7 @@ int main() {
                 L"EUI-D3D Win32 Demo  |  Menu + Toolbar + Tabs + Images  |  %.0f FPS", fps);
             SetWindowTextW(hwnd, title);
             frameCount = 0;
-            lastFpsTp  = now2;
+            lastFpsTp = now2;
         }
     }
 

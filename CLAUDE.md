@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-EUI-NEO is a C++17 cross-platform desktop UI framework built on OpenGL and GLFW. It provides a declarative DSL for composing UI trees, a flexbox-inspired layout engine, animation system, and 25+ reusable components. Targets Windows, macOS, and Linux.
+EUI-NEO is a C++17 desktop UI framework that renders with Direct3D 11 (Windows) and uses GLFW for windowing. It provides a declarative DSL for composing UI trees, a flexbox-inspired layout engine, animation system, and 25+ reusable components.
 
 ## Build Commands
 
 ```bash
-# Configure (from project root)
-cmake -B build
+# Configure (from project root) — Direct3D 11 renderer
+cmake -B build -DEUI_D3D11=ON
 
 # Build all apps
 cmake --build build
@@ -31,7 +31,7 @@ The framework centers on `core::dsl::Runtime` which manages composition, layout,
 
 - **dsl.h / dsl_runtime.h** — `Ui` builder API and runtime. Elements are composed declaratively each frame; the runtime diffs structure changes and re-layouts only when needed.
 - **layout.h** — Flexbox-style layout (Row, Column, Stack, Flow) with SizeMode (Fixed/WrapContent/Fill), flex grow/shrink, alignment, spacing.
-- **primitive.h** — OpenGL rendering of rects, text, images, polygons (gradients, shadows, rounded corners, blur).
+- **primitive.h** — Direct3D 11 rendering of rects, text, images, polygons (gradients, shadows, rounded corners, blur). See **d3d_context.h** for device/swapchain setup.
 - **animation.h** — Property animations with easing functions and transitions.
 - **event.h** — Pointer, keyboard, scroll, drag events with hit-testing and focus management.
 - **text.h** — TrueType font rendering via stb_truetype with dynamic glyph atlas and UTF-8 support.
@@ -63,11 +63,11 @@ The framework entry point is in `main.cpp` which manages the GLFW window lifecyc
 
 ### Third-Party (`3rd/`)
 
-Vendored: GLFW, glad, tray, stb_image, stb_truetype, nanosvg/nanosvgrast.
+Vendored: GLFW, tray, stb_image, stb_truetype, nanosvg/nanosvgrast. (glad is the OpenGL loader and is no longer used by the D3D11 renderer.)
 
 ## Key Design Constraints
 
 - **No exceptions or RTTI** — compiled with `-fno-exceptions -fno-rtti` (GCC/Clang) for small binaries.
 - **Lazy rendering** — only redraws when state changes; uses `glfwWaitEvents` when idle.
-- **Single-threaded rendering** — all GL calls on main thread; background work via async worker pool.
+- **Single-threaded rendering** — all GPU/render calls on main thread; background work via async worker pool.
 - **C99 for platform bridges** — `tray_bridge.c`, `ime_bridge.c` use C99 for Objective-C and system API interop.

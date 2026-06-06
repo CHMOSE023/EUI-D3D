@@ -57,6 +57,12 @@ namespace core {
 #endif
 
         std::unordered_map<std::string, TextureRecord> gTextureCache;
+
+#ifdef EUI_D3D11
+        // External SRV registry: key → non-owning SRV + dimensions
+        struct ExternalSrvRecord { ID3D11ShaderResourceView* srv = nullptr; int w = 0, h = 0; };
+        std::unordered_map<std::string, ExternalSrvRecord> gExternalSrvCache;
+#endif
         std::unordered_map<std::string, std::string> gDownloadedPathCache;
         std::unordered_map<std::string, bool> gDownloadInFlight;
         std::unordered_map<std::string, bool> gDownloadFailed;
@@ -658,6 +664,21 @@ namespace core {
     }
 
     bool ImagePrimitive::updateTexture() {
+#ifdef EUI_D3D11
+        // Check external SRV registry first (e.g. offscreen render targets)
+        {
+            const auto extIt = gExternalSrvCache.find(source_);
+            if (extIt != gExternalSrvCache.end()) {
+                const bool changed = (textureSrv_ != extIt->second.srv);
+                textureSrv_    = extIt->second.srv;
+                textureWidth_  = extIt->second.w;
+                textureHeight_ = extIt->second.h;
+                loadedSource_  = source_;
+                pendingLoad_   = false;
+                return changed;
+            }
+        }
+#endif
         bool pending = false;
         const std::string resolvedPath = resolveImagePath(source_, &pending);
         pendingLoad_ = pending;
@@ -1380,5 +1401,16 @@ namespace core {
             vertices[offset + 5] = uv[index].y;
         }
     }
+
+#ifdef EUI_D3D11
+    void ImagePrimitive::registerExternalSRV(const std::string& key,
+        ID3D11ShaderResourceView* srv, int width, int height) {
+        gExternalSrvCache[key] = { srv, width, height };
+    }
+
+    void ImagePrimitive::unregisterExternalSRV(const std::string& key) {
+        gExternalSrvCache.erase(key);
+    }
+#endif
 
     } // namespace core

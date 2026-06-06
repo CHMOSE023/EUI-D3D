@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef EUI_D3D11
+#include "components/cube3d.h"
+#endif
+
 #include "components/button.h"
 #include "components/checkbox.h"
 #include "components/colorpicker.h"

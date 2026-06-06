@@ -19,10 +19,11 @@
 namespace core::dsl {
 
     using AnimProperty = core::AnimProperty;
-    using Ease = core::Ease;
-    using Transition = core::Transition;
+    using Ease         = core::Ease;
+    using Transition   = core::Transition;
 
-    inline std::string utf8(unsigned int codepoint) {
+    inline std::string utf8(unsigned int codepoint) 
+    {
         std::string result;
         if (codepoint <= 0x7F) {
             result.push_back(static_cast<char>(codepoint));
@@ -45,7 +46,8 @@ namespace core::dsl {
         return result;
     }
 
-    enum class ElementKind {
+    enum class ElementKind
+    {
         Row,
         Column,
         Stack,
@@ -53,15 +55,18 @@ namespace core::dsl {
         Rect,
         Polygon,
         Text,
-        Image
+        Image,
+        Canvas  // D3D11 direct-render element — callback draws into the main RT
     };
 
-    struct Screen {
+    struct Screen 
+    {
         float width = 0.0f;
         float height = 0.0f;
     };
 
-    struct DragEvent {
+    struct DragEvent
+    {
         double x = 0.0;
         double y = 0.0;
         double deltaX = 0.0;
@@ -70,7 +75,8 @@ namespace core::dsl {
         double totalY = 0.0;
     };
 
-    struct Element {
+    struct Element 
+    {
         ElementKind kind = ElementKind::Stack;
         std::string id;
 
@@ -120,6 +126,16 @@ namespace core::dsl {
         std::string imageSource;
         bool imageFlipVertically = false;
         ImageFit imageFit = ImageFit::Cover;
+
+#ifdef EUI_D3D11
+        // Canvas element: user-supplied D3D11 render callback.
+        // Signature: void(ID3D11DeviceContext* ctx, const Rect& pixelFrame)
+        // pixelFrame is the element's position/size in physical pixels within
+        // the current render target. The callback is free to set its own
+        // viewport, depth buffer, and shaders; the runtime restores key state
+        // (viewport, blend, depth, rasterizer) after the call returns.
+        std::function<void(ID3D11DeviceContext*, const Rect&)> onD3DRender;
+#endif
 
         bool interactive = false;
         bool focusable = false;
@@ -731,17 +747,20 @@ namespace core::dsl {
 
     };
 
-    class LayoutBuilder : public BuilderBase<LayoutBuilder> {
+    class LayoutBuilder : public BuilderBase<LayoutBuilder>
+    {
     public:
         LayoutBuilder(Ui& ui, Element* element) : BuilderBase<LayoutBuilder>(ui, element) {}
     };
 
-    class RectBuilder : public ShapeBuilderBase<RectBuilder> {
+    class RectBuilder : public ShapeBuilderBase<RectBuilder>
+    {
     public:
         RectBuilder(Ui& ui, Element* element) : ShapeBuilderBase<RectBuilder>(ui, element) {}
     };
 
-    class PolygonBuilder : public ShapeBuilderBase<PolygonBuilder> {
+    class PolygonBuilder : public ShapeBuilderBase<PolygonBuilder> 
+    {
     public:
         PolygonBuilder(Ui& ui, Element* element) : ShapeBuilderBase<PolygonBuilder>(ui, element) {}
 
@@ -761,7 +780,8 @@ namespace core::dsl {
         }
     };
 
-    class TextBuilder : public BuilderBase<TextBuilder> {
+    class TextBuilder : public BuilderBase<TextBuilder>
+    {
     public:
         TextBuilder(Ui& ui, Element* element) : BuilderBase<TextBuilder>(ui, element) {}
 
@@ -842,7 +862,8 @@ namespace core::dsl {
 
     };
 
-    class ImageBuilder : public BuilderBase<ImageBuilder> {
+    class ImageBuilder : public BuilderBase<ImageBuilder> 
+    {
     public:
         ImageBuilder(Ui& ui, Element* element) : BuilderBase<ImageBuilder>(ui, element) {}
 
@@ -949,9 +970,28 @@ namespace core::dsl {
         }
     };
 
-    class Ui {
+#ifdef EUI_D3D11
+    // CanvasBuilder — returned by Ui::canvas().
+    // Inherits all layout + interaction methods from BuilderBase.
+    // The onRender callback is invoked each frame during the render pass;
+    // it receives the D3D11 context and the element's physical pixel rect.
+    class CanvasBuilder : public BuilderBase<CanvasBuilder>
+    {
     public:
-        void begin(const std::string& pageId = "") {
+        CanvasBuilder(Ui& ui, Element* element) : BuilderBase<CanvasBuilder>(ui, element) {}
+
+        CanvasBuilder& onRender(std::function<void(ID3D11DeviceContext*, const Rect&)> callback) {
+            element_->onD3DRender = std::move(callback);
+            return *this;
+        }
+    };
+#endif
+
+    class Ui
+    {
+    public:
+        void begin(const std::string& pageId = "") 
+        {
             pageId_ = pageId;
             roots_.clear();
             stack_.clear();
@@ -999,6 +1039,12 @@ namespace core::dsl {
             return ImageBuilder(*this, addElement(ElementKind::Image, id));
         }
 
+#ifdef EUI_D3D11
+        CanvasBuilder canvas(const std::string& id) {
+            return CanvasBuilder(*this, addElement(ElementKind::Canvas, id));
+        }
+#endif
+
         void layout(float width, float height) {
             for (const auto& root : roots_) {
                 std::vector<std::pair<Element*, Node*>> links;
@@ -1040,6 +1086,9 @@ namespace core::dsl {
         friend class BuilderBase<PolygonBuilder>;
         friend class BuilderBase<TextBuilder>;
         friend class BuilderBase<ImageBuilder>;
+#ifdef EUI_D3D11
+        friend class BuilderBase<CanvasBuilder>;
+#endif
 
         void setFocusedId(const std::string& id) {
             focusedId_ = id;
@@ -1103,6 +1152,11 @@ namespace core::dsl {
             else if (kind == ElementKind::Image) {
                 prefix = "__image";
             }
+#ifdef EUI_D3D11
+            else if (kind == ElementKind::Canvas) {
+                prefix = "__canvas";
+            }
+#endif
             return resolveId(std::string(prefix) + "." + std::to_string(generatedId_++));
         }
 
